@@ -136,36 +136,22 @@ class NodeGo:
                 print("1. Run With Monosans Proxy")
                 print("2. Run With Private Proxy")
                 print("3. Run Without Proxy")
-                choose = int(input("Choose [1/2/3] -> ").strip())
+                proxy_choice = int(input("Choose [1/2/3] -> ").strip())
 
-                if choose in [1, 2, 3]:
+                if proxy_choice in [1, 2, 3]:
                     proxy_type = (
-                        "Run With Monosans Proxy" if choose == 1 else 
-                        "Run With Private Proxy" if choose == 2 else 
+                        "Run With Monosans Proxy" if proxy_choice == 1 else 
+                        "Run With Private Proxy" if proxy_choice == 2 else 
                         "Run Without Proxy"
                     )
                     print(f"{Fore.GREEN + Style.BRIGHT}{proxy_type} Selected.{Style.RESET_ALL}")
-                    break
+                    return proxy_choice
                 else:
                     print(f"{Fore.RED + Style.BRIGHT}Please enter either 1, 2 or 3.{Style.RESET_ALL}")
             except ValueError:
                 print(f"{Fore.RED + Style.BRIGHT}Invalid input. Enter a number (1, 2 or 3).{Style.RESET_ALL}")
 
-        nodes_count = 0
-        if choose in [1, 2]:
-            while True:
-                try:
-                    nodes_count = int(input("How Many Nodes Do You Want to Run For Each Account? -> "))
-                    if nodes_count > 0:
-                        break
-                    else:
-                        print(f"{Fore.RED+Style.BRIGHT}Please enter a positive number.{Style.RESET_ALL}")
-                except ValueError:
-                    print(f"{Fore.RED+Style.BRIGHT}Invalid input. Enter a number.{Style.RESET_ALL}")
-
-        return nodes_count, choose
-
-    async def user_data(self, token: str, email: str, use_proxy: bool, proxy=None, retries=5):
+    async def user_data(self, token: str, email: str, proxy=None, retries=5):
         url = "https://nodego.ai/api/user/me"
         headers = {
             **self.headers,
@@ -173,7 +159,7 @@ class NodeGo:
         }
         for attempt in range(retries):
             try:
-                response = await asyncio.to_thread(requests.get, url=url, headers=headers, proxy=proxy, timeout=60, impersonate="safari15_5")
+                response = await asyncio.to_thread(requests.get, url=url, headers=headers, proxy=proxy, timeout=60, impersonate="chrome110")
                 response.raise_for_status()
                 result = response.json()
                 return result["metadata"]
@@ -181,45 +167,12 @@ class NodeGo:
                 if attempt < retries - 1:
                     await asyncio.sleep(5)
                     continue
-
-                if not "520" in str(e):
-                    self.rotate_proxy_for_account(email) if use_proxy else None
 
                 return self.print_message(self.mask_account(email), proxy, Fore.RED, 
                     f"GET User Data Failed: "
                     f"{Fore.YELLOW + Style.BRIGHT}{str(e)}{Style.RESET_ALL}"
                 )
             
-    async def claim_checkin(self, token: str, email: str, day_checkin: int, proxy=None, retries=5):
-        url = "https://nodego.ai/api/user/checkin"
-        headers = {
-            **self.headers,
-            "Authorization": f"Bearer {token}",
-            "Content-Length": "0"
-        }
-        for attempt in range(retries):
-            try:
-                response = await asyncio.to_thread(requests.post, url=url, headers=headers, proxy=proxy, timeout=60, impersonate="safari15_5")
-                if response.status_code == 400:
-                    return self.print_message(self.mask_account(email), proxy, Fore.WHITE, 
-                        f"Check-In Day {day_checkin}"
-                        f"{Fore.RED + Style.BRIGHT} Isn't Claimed: {Style.RESET_ALL}"
-                        f"{Fore.YELLOW + Style.BRIGHT} Already Claimed{Style.RESET_ALL}"
-                    )
-                
-                response.raise_for_status()
-                result = response.json()
-                return result["metadata"]
-            except Exception as e:
-                if attempt < retries - 1:
-                    await asyncio.sleep(5)
-                    continue
-
-                return self.print_message(self.mask_account(email), proxy, Fore.RED, 
-                    f"Checkin Day {day_checkin} Isn't Claimed: "
-                    f"{Fore.YELLOW + Style.BRIGHT}{str(e)}{Style.RESET_ALL}"
-                )
-
     async def task_lists(self, token: str, email: str, proxy=None, retries=5):
         url = "https://nodego.ai/api/tasks"
         headers = {
@@ -228,7 +181,7 @@ class NodeGo:
         }
         for attempt in range(retries):
             try:
-                response = await asyncio.to_thread(requests.get, url=url, headers=headers, proxy=proxy, timeout=60, impersonate="safari15_5")
+                response = await asyncio.to_thread(requests.get, url=url, headers=headers, proxy=proxy, timeout=60, impersonate="chrome110")
                 response.raise_for_status()
                 result = response.json()
                 return result["metadata"]
@@ -253,7 +206,7 @@ class NodeGo:
         }
         for attempt in range(retries):
             try:
-                response = await asyncio.to_thread(requests.post, url=url, headers=headers, data=data, proxy=proxy, timeout=60, impersonate="safari15_5")
+                response = await asyncio.to_thread(requests.post, url=url, headers=headers, data=data, proxy=proxy, timeout=60, impersonate="chrome110")
                 if response.status_code == 400:
                     return self.print_message(self.mask_account(email), proxy, Fore.WHITE, 
                         f"Task {title}"
@@ -274,7 +227,7 @@ class NodeGo:
                     f"{Fore.YELLOW + Style.BRIGHT}{str(e)}{Style.RESET_ALL}"
                 )
             
-    async def send_ping(self, token: str, email: str, num_id: int, proxy=None, retries=5):
+    async def send_ping(self, token: str, email: str, proxy=None, retries=5):
         url = "https://nodego.ai/api/user/nodes/ping"
         data = json.dumps({"type":"extension"})
         headers = {
@@ -292,7 +245,11 @@ class NodeGo:
         }
         for attempt in range(retries):
             try:
-                response = await asyncio.to_thread(requests.post, url=url, headers=headers, data=data, proxy=proxy, timeout=60, impersonate="safari15_5")
+                response = await asyncio.to_thread(requests.post, url=url, headers=headers, data=data, proxy=proxy, timeout=60, impersonate="chrome110")
+                if response.status_code == 429:
+                    return self.print_message(self.mask_account(email), proxy, Fore.WHITE, 
+                        f"{Fore.RED + Style.BRIGHT}PING Failed: {Fore.YELLOW + Style.BRIGHT}Too many request!{Style.RESET_ALL}"
+                    )
                 response.raise_for_status()
                 result = response.json()
                 return result["metadata"]
@@ -302,34 +259,17 @@ class NodeGo:
                     continue
 
                 return self.print_message(self.mask_account(email), proxy, Fore.WHITE, 
-                    f"Node {num_id} "
-                    f"{Fore.MAGENTA + Style.BRIGHT}-{Style.RESET_ALL}"
-                    f"{Fore.RED + Style.BRIGHT} PING Failed: {Style.RESET_ALL}"
-                    f"{Fore.YELLOW + Style.BRIGHT}{str(e)}{Style.RESET_ALL}"
+                    f"{Fore.RED + Style.BRIGHT}PING Failed: {Fore.YELLOW + Style.BRIGHT}{str(e)}{Style.RESET_ALL}"
                 )
 
-    async def process_daily_checkin(self, user, token: str, email: str, use_proxy: bool):
+    async def process_complete_tasks(self, token: str, email: str, use_proxy: bool):
         while True:
             proxy = self.get_next_proxy_for_account(email) if use_proxy else None
 
-            day_checkin = user.get("checkinDay", 0)
-
-            claim = await self.claim_checkin(token, email, day_checkin, proxy)
-            if claim:
-                message = claim.get("message", "N/A")
-                self.print_message(self.mask_account(email), proxy, Fore.WHITE, 
-                    f"Check-In Day {day_checkin+1}"
-                    f"{Fore.GREEN + Style.BRIGHT} Is Claimed {Style.RESET_ALL}"
-                    f"{Fore.MAGENTA + Style.BRIGHT}-{Style.RESET_ALL}"
-                    f"{Fore.CYAN + Style.BRIGHT} Reward: {Style.RESET_ALL}"
-                    f"{Fore.WHITE + Style.BRIGHT}{message}{Style.RESET_ALL}"
-                )
-
-            await asyncio.sleep(12 * 60 * 60)
-
-    async def process_complete_tasks(self, user, token: str, email: str, use_proxy: bool):
-        while True:
-            proxy = self.get_next_proxy_for_account(email) if use_proxy else None
+            user = await self.user_data(token, email, proxy)
+            if not user:
+                await asyncio.sleep(5)
+                continue
 
             completed_tasks = user.get("socialTask", [])
             tasks = await self.task_lists(token, email, proxy)
@@ -355,9 +295,9 @@ class NodeGo:
 
             await asyncio.sleep(24 * 60 * 60)
 
-    async def process_send_ping(self, token: str, email: str, num_id: int, use_proxy: bool):
+    async def process_send_ping(self, token: str, email: str, use_proxy: bool):
         while True:
-            proxy = self.get_next_proxy_for_account(num_id) if use_proxy else None
+            proxy = self.get_next_proxy_for_account(email) if use_proxy else None
 
             print(
                 f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
@@ -367,62 +307,33 @@ class NodeGo:
                 flush=True
             )
 
-            ping = await self.send_ping(token, email, num_id, proxy)
+            ping = await self.send_ping(token, email, proxy)
             if ping:
                 message = ping.get("message")
                 self.print_message(self.mask_account(email), proxy, Fore.WHITE, 
-                    f"Node {num_id}"
-                    f"{Fore.MAGENTA + Style.BRIGHT} - {Style.RESET_ALL}"
                     f"{Fore.GREEN + Style.BRIGHT}{message}{Style.RESET_ALL}"
                 )
 
             print(
                 f"{Fore.CYAN + Style.BRIGHT}[ {datetime.now().astimezone(wib).strftime('%x %X %Z')} ]{Style.RESET_ALL}"
                 f"{Fore.WHITE + Style.BRIGHT} | {Style.RESET_ALL}"
-                f"{Fore.BLUE + Style.BRIGHT}Wait For 2 Minutes For Next Ping...{Style.RESET_ALL}",
+                f"{Fore.BLUE + Style.BRIGHT}Wait For 10 Minutes For Next Ping...{Style.RESET_ALL}",
                 end="\r"
             )
-            await asyncio.sleep(2 * 60)
-
-    async def process_get_user_data(self, token: str, email: str, use_proxy: bool):
-        proxy = self.get_next_proxy_for_account(email) if use_proxy else None
-
-        user = None
-        while user is None:
-            user = await self.user_data(token, email, use_proxy, proxy)
-            if not user:
-                await asyncio.sleep(5)
-                continue
-
-            self.print_message(self.mask_account(email), proxy, Fore.GREEN, 
-                f"GET User Data Success"
-            )
-            return user
+            await asyncio.sleep(10 * 60)
         
-    async def process_accounts(self, token: str, email: str, node_count: int, use_proxy: bool):
-        user = await self.process_get_user_data(token, email, use_proxy)
-        if user:
-
-            tasks = []
-            tasks.append(asyncio.create_task(self.process_daily_checkin(user, token, email, use_proxy)))
-            tasks.append(asyncio.create_task(self.process_complete_tasks(user, token, email, use_proxy)))
-            if use_proxy:
-                for i in range(node_count):
-                    num_id = i + 1
-                    tasks.append(asyncio.create_task(self.process_send_ping(token, email, num_id, use_proxy)))
-
-            else:
-                num_id = 1
-                tasks.append(asyncio.create_task(self.process_send_ping(token, email, num_id, use_proxy)))
-
-            await asyncio.gather(*tasks)
+    async def process_accounts(self, token: str, email: str, use_proxy: bool):
+        tasks = []
+        tasks.append(asyncio.create_task(self.process_complete_tasks(token, email, use_proxy)))
+        tasks.append(asyncio.create_task(self.process_send_ping(token, email, use_proxy)))
+        await asyncio.gather(*tasks)
         
     async def main(self):
         try:
             with open('tokens.txt', 'r') as file:
                 tokens = [line.strip() for line in file if line.strip()]
 
-            node_count, use_proxy_choice = self.print_question()
+            use_proxy_choice = self.print_question()
 
             use_proxy = False
             if use_proxy_choice in [1, 2]:
@@ -447,7 +358,7 @@ class NodeGo:
                         email = self.decode_token(token)
 
                         if "@" in email:
-                            tasks.append(asyncio.create_task(self.process_accounts(token, email, node_count, use_proxy)))
+                            tasks.append(asyncio.create_task(self.process_accounts(token, email, use_proxy)))
 
                 await asyncio.gather(*tasks)
                 await asyncio.sleep(10)
